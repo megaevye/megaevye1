@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Gizli Yolcu</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { font-family: system-ui, sans-serif; margin: 0; }
+#top { padding: 10px; background:#111; color:#fff; }
+#map { height: 35vh; }
+#panel { padding: 10px; }
+.badge { padding:4px 8px; border-radius:12px; background:#eee; margin-right:6px;}
+.timer { font-weight:700; }
+.list { margin-top:10px; }
+.item { padding:6px 0; border-bottom:1px solid #eee; }
+.small { color:#666; font-size:13px; }
+</style>
+</head>
+<body>
+
+<div id="top">
+  🚕 Gizli Yolcu
+  <span class="badge">KM 60 TL</span>
+  <span class="badge">0–5 KM: 300 TL</span>
+  <span class="badge timer">Yenileme: <span id="t">60</span>s</span>
+</div>
+
+<div id="map"></div>
+
+<div id="panel">
+  <h3>🚗 Sana En Yakın 5 Araç</h3>
+  <div id="cars" class="list"></div>
+
+  <h3>🚶 Sana En Yakın 5 Yolcu</h3>
+  <div id="passengers" class="list"></div>
+</div>
+
+<script>
+let map, userMarker, countdown = 60, timerInt;
+
+// ÖRNEK VERİ (sonra Sheets/Telegram’dan beslenir)
+const cars = [
+ {name:'@arac1', lat:40.990, lng:29.030},
+ {name:'@arac2', lat:40.995, lng:29.020},
+ {name:'@arac3', lat:40.985, lng:29.015},
+ {name:'@arac4', lat:40.980, lng:29.010},
+ {name:'@arac5', lat:41.000, lng:29.000},
+ {name:'@arac6', lat:41.005, lng:29.040}
+];
+const passengers = [
+ {name:'@yolcu1', lat:40.992, lng:29.028},
+ {name:'@yolcu2', lat:40.987, lng:29.018},
+ {name:'@yolcu3', lat:41.002, lng:29.012},
+ {name:'@yolcu4', lat:40.978, lng:29.006},
+ {name:'@yolcu5', lat:40.996, lng:29.034},
+ {name:'@yolcu6', lat:41.010, lng:29.020}
+];
+
+function dist(a,b,c,d){
+  const R=6371, dLat=(c-a)*Math.PI/180, dLon=(d-b)*Math.PI/180;
+  const x=Math.sin(dLat/2)**2 + Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLon/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+function initMap(lat,lng){
+  map = new google.maps.Map(document.getElementById('map'), {
+    center:{lat,lng}, zoom:14
+  });
+  userMarker = new google.maps.Marker({
+    position:{lat,lng}, map, label:'SEN'
+  });
+  renderLists(lat,lng);
+}
+
+function renderLists(ulat, ulng){
+  document.getElementById('cars').innerHTML='';
+  document.getElementById('passengers').innerHTML='';
+
+  const sortedCars = cars
+    .map(o=>({...o,d:dist(ulat,ulng,o.lat,o.lng)}))
+    .sort((a,b)=>a.d-b.d).slice(0,5);
+
+  const sortedPass = passengers
+    .map(o=>({...o,d:dist(ulat,ulng,o.lat,o.lng)}))
+    .sort((a,b)=>a.d-b.d).slice(0,5);
+
+  sortedCars.forEach((o,i)=>{
+    new google.maps.Marker({
+      position:{lat:o.lat,lng:o.lng},
+      map, label:String(i+1)
+    });
+    document.getElementById('cars').innerHTML +=
+      `<div class="item"><b>${i+1}. ${o.name}</b>
+       <div class="small">${o.d.toFixed(2)} km • <a href="https://t.me/${o.name.replace('@','')}">Mesaj</a></div></div>`;
+  });
+
+  sortedPass.forEach((o,i)=>{
+    document.getElementById('passengers').innerHTML +=
+      `<div class="item"><b>${i+1}. ${o.name}</b>
+       <div class="small">${o.d.toFixed(2)} km • <a href="https://t.me/${o.name.replace('@','')}">Mesaj</a></div></div>`;
+  });
+}
+
+function tick(){
+  countdown--;
+  if(countdown<=0){ countdown=60; getLocation(); }
+  document.getElementById('t').textContent = countdown;
+}
+
+function getLocation(){
+  navigator.geolocation.getCurrentPosition(p=>{
+    const {latitude, longitude} = p.coords;
+    if(!map) initMap(latitude, longitude);
+    userMarker.setPosition({lat:latitude,lng:longitude});
+    map.setCenter({lat:latitude,lng:longitude});
+    renderLists(latitude, longitude);
+  });
+}
+
+getLocation();
+timerInt = setInterval(tick,1000);
+</script>
+
+<script src="https://maps.googleapis.com/maps/api/js"></script>
+</body>
+</html>
